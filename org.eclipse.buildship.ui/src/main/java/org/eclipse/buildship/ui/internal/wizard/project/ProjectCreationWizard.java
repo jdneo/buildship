@@ -81,12 +81,10 @@ public final class ProjectCreationWizard extends AbstractProjectWizard implement
         this.newGradleProjectPage = new NewGradleProjectWizardPage(importConfiguration, creationConfiguration);
         this.gradleOptionsPage = new GradleOptionsWizardPage(importConfiguration,
                 ProjectWizardMessages.Title_NewGradleProjectOptionsWizardPage,
-                ProjectWizardMessages.InfoMessage_NewGradleProjectOptionsWizardPageDefault,
-                ProjectWizardMessages.InfoMessage_NewGradleProjectOptionsWizardPageContext);
+                ProjectWizardMessages.InfoMessage_NewGradleProjectOptionsWizardPageDefault);
         this.projectPreviewPage = new ProjectPreviewWizardPage(importConfiguration,
                 ProjectWizardMessages.Title_NewGradleProjectPreviewWizardPage,
-                ProjectWizardMessages.InfoMessage_NewGradleProjectPreviewWizardPageDefault,
-                ProjectWizardMessages.InfoMessage_NewGradleProjectPreviewWizardPageContext);
+                ProjectWizardMessages.InfoMessage_NewGradleProjectPreviewWizardPageDefault);
     }
 
     @Override

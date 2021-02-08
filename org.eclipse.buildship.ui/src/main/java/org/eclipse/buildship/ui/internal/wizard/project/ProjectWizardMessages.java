@@ -49,14 +49,6 @@ public final class ProjectWizardMessages extends NLS {
     public static String InfoMessage_NewGradleProjectOptionsWizardPageDefault;
     public static String InfoMessage_NewGradleProjectPreviewWizardPageDefault;
 
-    public static String InfoMessage_GradleProjectWizardPageContext;
-    public static String InfoMessage_GradleOptionsWizardPageContext;
-    public static String InfoMessage_GradlePreviewWizardPageContext;
-
-    public static String InfoMessage_NewGradleProjectWizardPageContext;
-    public static String InfoMessage_NewGradleProjectOptionsWizardPageContext;
-    public static String InfoMessage_NewGradleProjectPreviewWizardPageContext;
-
     public static String Title_Dialog_Missing_Features;
     public static String Missing_Features_Tooltip;
     public static String Missing_Features_Details_0_1;
