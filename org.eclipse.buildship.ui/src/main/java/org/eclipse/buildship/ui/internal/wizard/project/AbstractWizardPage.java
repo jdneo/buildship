@@ -130,13 +130,15 @@ public abstract class AbstractWizardPage extends WizardPage {
     private Composite createWizardPageContent(Composite parent) {
         // create a scrollable root to handle resizing
         ScrolledComposite externalRoot = new ScrolledComposite(parent, SWT.H_SCROLL | SWT.V_SCROLL);
-        externalRoot.setExpandHorizontal(true);
-        externalRoot.setExpandVertical(true);
-        externalRoot.setMinSize(new Point(230, 380));
 
         // add the controls inside the root composite
         Composite container = new Composite(externalRoot, SWT.NONE);
         createWidgets(container);
+
+        Point preferredSize = container.computeSize(SWT.DEFAULT, SWT.DEFAULT);
+        externalRoot.setExpandHorizontal(true);
+        externalRoot.setExpandVertical(true);
+        externalRoot.setMinSize(preferredSize);
 
         // set the root's content and return it
         externalRoot.setContent(container);
