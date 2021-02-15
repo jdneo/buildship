@@ -27,11 +27,8 @@ import org.eclipse.buildship.ui.internal.test.fixtures.SwtBotSpecification
 class ProjectImportWizardUiTest extends SwtBotSpecification {
 
     def "can open import wizard from menu bar"()  {
-        setup:
-        openGradleImportWizard()
-
         when:
-        bot.styledText(ProjectWizardMessages.InfoMessage_GradleWelcomeWizardPageContext)
+        openGradleImportWizard()
 
         then:
         // if widget is not available then a WidgetNotFoundException is thrown
@@ -54,7 +51,6 @@ class ProjectImportWizardUiTest extends SwtBotSpecification {
 
         when:
         SWTBotShell wizard = openGradleImportWizard()
-        bot.button(IDialogConstants.NEXT_LABEL).click()
         bot.textWithLabel(ProjectWizardMessages.Label_ProjectRootDirectory).setText(projectDir.canonicalPath)
         bot.button(IDialogConstants.FINISH_LABEL).click()
 
@@ -69,7 +65,6 @@ class ProjectImportWizardUiTest extends SwtBotSpecification {
 
         when:
         openGradleImportWizard()
-        bot.button(IDialogConstants.NEXT_LABEL).click()
         bot.textWithLabel(ProjectWizardMessages.Label_ProjectRootDirectory).setText(projectDir.canonicalPath)
         bot.button(IDialogConstants.FINISH_LABEL).click()
         waitForGradleJobsToFinish()
