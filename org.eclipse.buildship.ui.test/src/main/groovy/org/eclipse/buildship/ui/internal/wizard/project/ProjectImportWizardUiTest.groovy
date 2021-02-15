@@ -12,11 +12,7 @@ package org.eclipse.buildship.ui.internal.wizard.project
 import org.eclipse.core.resources.IProject
 import org.eclipse.core.runtime.IProgressMonitor
 import org.eclipse.jface.dialogs.IDialogConstants
-import org.eclipse.jface.wizard.WizardDialog
 import org.eclipse.swtbot.eclipse.finder.waits.Conditions
-import org.eclipse.swtbot.swt.finder.SWTBot
-import org.eclipse.swtbot.swt.finder.waits.DefaultCondition
-import org.eclipse.swtbot.swt.finder.waits.ICondition
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotShell
 
 import org.eclipse.buildship.core.internal.CorePlugin
