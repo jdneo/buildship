@@ -1,0 +1,136 @@
+/*******************************************************************************
+ * Copyright (c) 2022 Microsoft Corporation and others.
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License 2.0
+ * which accompanies this distribution, and is available at
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *     Microsoft Corporation - initial API and implementation
+ *******************************************************************************/
+import org.gradle.api.Project
+import org.gradle.api.Plugin
+import org.gradle.api.file.Directory
+import org.gradle.api.file.FileCollection
+import org.gradle.api.plugins.JavaPluginConvention
+import org.gradle.api.plugins.JavaPluginExtension
+import org.gradle.api.plugins.PluginContainer
+import org.gradle.api.provider.Provider
+import org.gradle.api.tasks.SourceSet
+import org.gradle.api.tasks.compile.CompileOptions
+import org.gradle.api.tasks.compile.JavaCompile
+import org.gradle.tooling.provider.model.ToolingModelBuilder
+import org.gradle.tooling.provider.model.ToolingModelBuilderRegistry
+import org.gradle.util.GradleVersion
+
+import javax.inject.Inject
+
+class GradleAnnotationProcessorPatchPlugin implements Plugin<Project> {
+
+    private final ToolingModelBuilderRegistry registry
+
+    @Inject
+    GradleAnnotationProcessorPatchPlugin(ToolingModelBuilderRegistry registry) {
+        this.registry = registry
+    }
+
+    @Override
+    void apply(Project project) {
+        this.registry.register(new AnnotationProcessorModelBuilder())
+    }
+
+    private static class AnnotationProcessorModelBuilder implements ToolingModelBuilder {
+
+        @Override
+        boolean canBuild(String modelName) {
+            return "java.util.Map" == modelName
+        }
+
+        @Override
+        Object buildAll(String modelName, Project rootProject) {
+            final GradleVersion current = GradleVersion.current().getBaseVersion()
+            if (current < GradleVersion.version("5.2")) {
+                return Collections.emptyMap()
+            }
+
+            Set<Project> allProject = rootProject.getAllprojects()
+            Map<File, Map<String, Object>> annotationProcessorInfo = new HashMap<>()
+            for (Project project : allProject) {
+                PluginContainer plugins = project.getPlugins()
+                if (!hasPlugin(plugins, "java")) {
+                    continue
+                }
+                Map<String, Object> classpathInfo = new HashMap<>()
+                final JavaPluginExtension javaPlugin = project.getExtensions().findByType(JavaPluginExtension.class)
+                SourceSet mainSourceSet = javaPlugin.getSourceSets().getByName("main")
+                Set<File> mainJava = mainSourceSet.getJava().getSrcDirs()
+                classpathInfo.put("mainJava", mainJava)
+
+                Directory mainJavaOutput = mainSourceSet.getJava().getClassesDirectory().getOrNull()
+                if (mainJavaOutput != null) {
+                    classpathInfo.put("mainJavaOutput", mainJavaOutput.getAsFile())
+                }
+
+                Set<File> mainResources = mainSourceSet.getResources().getSrcDirs()
+                classpathInfo.put("mainResources", mainResources)
+
+                Directory mainResourcesOutput = mainSourceSet.getResources().getClassesDirectory().getOrNull()
+                if (mainResourcesOutput != null) {
+                    classpathInfo.put("mainResourcesOutput", mainResourcesOutput.getAsFile())
+                }
+
+                SourceSet testSourceSet = javaPlugin.getSourceSets().getByName("test")
+                Set<File> testJava = testSourceSet.getJava().getSrcDirs()
+                classpathInfo.put("testJava", testJava)
+
+                Directory testJavaOutput = testSourceSet.getJava().getClassesDirectory().getOrNull()
+                if (testJavaOutput != null) {
+                    classpathInfo.put("testJavaOutput", testJavaOutput.getAsFile())
+                }
+
+                Set<File> testResources = testSourceSet.getResources().getSrcDirs()
+                classpathInfo.put("testResources", testResources)
+
+                Directory testResourcesOutput = testSourceSet.getResources().getClassesDirectory().getOrNull()
+                if (testResourcesOutput != null) {
+                    classpathInfo.put("testResourcesOutput", testResourcesOutput.getAsFile())
+                }
+
+                File main = collectApConfiguration(project, "compileJava")
+                if (main != null) {
+                    classpathInfo.put("mainGeneratedDirectory", main)
+                }
+                File test = collectApConfiguration(project, "testCompileJava")
+                if (test != null) {
+                    classpathInfo.put("testGeneratedDirectory", test)
+                }
+                annotationProcessorInfo.put(project.getProjectDir(), classpathInfo)
+            }
+            return annotationProcessorInfo
+        }
+
+        private static boolean hasPlugin(PluginContainer plugins, String pluginId) {
+            return plugins.findPlugin(pluginId) != null
+        }
+
+        private File collectApConfiguration(project, compileTaskName) {
+            JavaCompile javaCompile = project.getTasks().findByName(compileTaskName)
+            if (javaCompile != null) {
+                CompileOptions options = javaCompile.getOptions()
+                Directory generatedDir = options.getGeneratedSourceOutputDirectory().get()
+                if (generatedDir != null) {
+                    return generatedDir.getAsFile()
+                }
+                return null
+            }
+        }
+    }
+}
+
+allprojects {
+    afterEvaluate {
+        it.getPlugins().apply(GradleAnnotationProcessorPatchPlugin)
+    }
+}

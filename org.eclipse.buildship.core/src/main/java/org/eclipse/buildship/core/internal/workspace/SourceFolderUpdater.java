@@ -9,9 +9,15 @@
  ******************************************************************************/
 package org.eclipse.buildship.core.internal.workspace;
 
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.Set;
 
 import org.gradle.tooling.model.eclipse.ClasspathAttribute;
 import org.gradle.tooling.model.eclipse.EclipseSourceDirectory;
@@ -53,14 +59,64 @@ import org.eclipse.buildship.core.internal.util.gradle.CompatEclipseSourceDirect
 final class SourceFolderUpdater {
 
     private final IJavaProject project;
-    private final Map<IPath, EclipseSourceDirectory> sourceFoldersByPath;
+    private final Map<IPath, File> sourceFoldersByPath;
+    private final File mainJavaOutputDirectory;
+    private final File mainResourceOutputDirectory;
+    private final File testJavaOutputDirectory;
+    private final File testResourceOutputDirectory;
 
-    private SourceFolderUpdater(IJavaProject project, List<EclipseSourceDirectory> sourceDirectories) {
+    private SourceFolderUpdater(IJavaProject project, List<EclipseSourceDirectory> sourceDirectories,
+    		 Map<String, Object> classpathInfo) {
         this.project = Preconditions.checkNotNull(project);
         this.sourceFoldersByPath = Maps.newLinkedHashMap();
-        for (EclipseSourceDirectory sourceFolder : sourceDirectories) {
-            IPath fullPath = project.getProject().getFullPath().append(sourceFolder.getPath());
-            this.sourceFoldersByPath.put(fullPath, sourceFolder);
+        IPath projectLocation = project.getProject().getRawLocation();
+        
+        mainJavaOutputDirectory = (File) classpathInfo.get("mainJavaOutput");
+        if (mainJavaOutputDirectory != null) {
+        	Set<File> mainJava = (Set<File>) classpathInfo.getOrDefault("mainJava", Collections.emptySet());
+            for (File mainJavaDirectory : mainJava) {
+            	IPath fullPath = project.getProject().getFullPath().append(new Path(mainJavaDirectory.toString()).makeRelativeTo(projectLocation));
+            	this.sourceFoldersByPath.put(fullPath, mainJavaDirectory);
+            }
+            
+            File mainGeneratedDirectory = (File) classpathInfo.get("mainGeneratedDirectory");
+            if (mainGeneratedDirectory != null) {
+            	IPath fullPath = project.getProject().getFullPath().append(new Path(mainGeneratedDirectory.toString()).makeRelativeTo(projectLocation));
+            	this.sourceFoldersByPath.put(fullPath, mainGeneratedDirectory);
+            }
+        }
+        
+        mainResourceOutputDirectory = (File) classpathInfo.get("mainResourcesOutput");
+        if (mainResourceOutputDirectory != null) {
+        	Set<File> mainResources = (Set<File>) classpathInfo.getOrDefault("mainResources", Collections.emptySet());
+            for (File mainResourceDirectory : mainResources) {
+            	IPath fullPath = project.getProject().getFullPath().append(new Path(mainResourceDirectory.toString()).makeRelativeTo(projectLocation));
+            	this.sourceFoldersByPath.put(fullPath, mainResourceDirectory);
+            }
+        }
+        
+        testJavaOutputDirectory = (File) classpathInfo.get("testJavaOutput");
+        if (testJavaOutputDirectory != null) {
+        	Set<File> testJava = (Set<File>) classpathInfo.getOrDefault("testJava", Collections.emptySet());
+            for (File testJavaDirectory : testJava) {
+            	IPath fullPath = project.getProject().getFullPath().append(new Path(testJavaDirectory.toString()).makeRelativeTo(projectLocation));
+            	this.sourceFoldersByPath.put(fullPath, testJavaDirectory);
+            }
+            
+            File testGeneratedDirectory = (File) classpathInfo.get("testGeneratedDirectory");
+            if (testGeneratedDirectory != null) {
+            	IPath fullPath = project.getProject().getFullPath().append(new Path(testGeneratedDirectory.toString()).makeRelativeTo(projectLocation));
+            	this.sourceFoldersByPath.put(fullPath, testGeneratedDirectory);
+            }
+        }
+        
+        testResourceOutputDirectory = (File) classpathInfo.get("testResourcesOutput");
+        if (testResourceOutputDirectory != null) {
+        	Set<File> testResources = (Set<File>) classpathInfo.getOrDefault("testResources", Collections.emptySet());
+            for (File testResourceDirectory : testResources) {
+            	IPath fullPath = project.getProject().getFullPath().append(new Path(testResourceDirectory.toString()).makeRelativeTo(projectLocation));
+            	this.sourceFoldersByPath.put(fullPath, testResourceDirectory);
+            }
         }
     }
 
@@ -77,24 +133,35 @@ final class SourceFolderUpdater {
             IClasspathEntry classpathEntry = iterator.next();
             if (classpathEntry.getEntryKind() == IClasspathEntry.CPE_SOURCE) {
                 IPath path = classpathEntry.getPath();
-                EclipseSourceDirectory sourceFolder = this.sourceFoldersByPath.get(path);
+                File sourceFolder = this.sourceFoldersByPath.get(path);
                 if (sourceFolder == null) {
                     iterator.remove();
-                } else {
-                    iterator.set(toClasspathEntry(sourceFolder, classpathEntry));
+            	} else {
+                	iterator.set(toClasspathEntry(sourceFolder, classpathEntry));
                     this.sourceFoldersByPath.remove(path);
                 }
             }
         }
     }
 
-    private IClasspathEntry toClasspathEntry(EclipseSourceDirectory sourceFolder, IClasspathEntry existingEntry) {
+//    private IClasspathEntry toClasspathEntry(EclipseSourceDirectory sourceFolder, IClasspathEntry existingEntry) {
+//        SourceFolderEntryBuilder builder = new SourceFolderEntryBuilder(this.project, existingEntry.getPath());
+//        builder.setOutput(existingEntry.getOutputLocation());
+//        builder.setAttributes(existingEntry.getExtraAttributes());
+//        builder.setIncludes(existingEntry.getInclusionPatterns());
+//        builder.setExcludes(existingEntry.getExclusionPatterns());
+//        synchronizeAttributesFromModel(builder, sourceFolder);
+//        return builder.build();
+//    }
+    
+    private IClasspathEntry toClasspathEntry(File generatedDirectory, IClasspathEntry existingEntry) {
         SourceFolderEntryBuilder builder = new SourceFolderEntryBuilder(this.project, existingEntry.getPath());
         builder.setOutput(existingEntry.getOutputLocation());
-        builder.setAttributes(existingEntry.getExtraAttributes());
+        List<IClasspathAttribute> attributes = new ArrayList<>(Arrays.asList(existingEntry.getExtraAttributes()));
+        attributes.add(JavaCore.newClasspathAttribute(IClasspathAttribute.OPTIONAL, "true"));
+        builder.setAttributes(attributes.toArray(IClasspathAttribute[]::new));
         builder.setIncludes(existingEntry.getInclusionPatterns());
         builder.setExcludes(existingEntry.getExclusionPatterns());
-        synchronizeAttributesFromModel(builder, sourceFolder);
         return builder.build();
     }
 
@@ -117,17 +184,26 @@ final class SourceFolderUpdater {
     }
 
     private void addNewSourceFolders(List<IClasspathEntry> classpath) {
-        for (EclipseSourceDirectory sourceFolder : this.sourceFoldersByPath.values()) {
+        for (File sourceFolder : this.sourceFoldersByPath.values()) {
             IResource physicalLocation = getUnderlyingDirectory(sourceFolder);
-            if (existsInSameLocation(physicalLocation, sourceFolder)) {
-                classpath.add(toClasspathEntry(sourceFolder, physicalLocation));
-            }
+//            if (existsInSameLocation(physicalLocation, sourceFolder)) {
+                classpath.add(toClasspathEntry(sourceFolder, physicalLocation, sourceFolder.toString().contains("test")));
+//            }
         }
     }
 
     private IResource getUnderlyingDirectory(EclipseSourceDirectory directory) {
         IProject project = this.project.getProject();
         IPath path = project.getFullPath().append(directory.getPath());
+        if (path.segmentCount() == 1) {
+            return project;
+        }
+        return project.getFolder(path.removeFirstSegments(1));
+    }
+    
+    private IResource getUnderlyingDirectory(File directory) {
+        IProject project = this.project.getProject();
+        IPath path = project.getFullPath().append(new Path(directory.toString()).makeRelativeTo(project.getLocation()));
         if (path.segmentCount() == 1) {
             return project;
         }
@@ -157,10 +233,35 @@ final class SourceFolderUpdater {
         return directory.getLocation() != null && directory.getLocation().toFile().equals(sourceFolder.getDirectory());
     }
 
-    private IClasspathEntry toClasspathEntry(EclipseSourceDirectory sourceFolder, IResource physicalLocation) {
+//    private IClasspathEntry toClasspathEntry(EclipseSourceDirectory sourceFolder, IResource physicalLocation) {
+//        IPackageFragmentRoot fragmentRoot = this.project.getPackageFragmentRoot(physicalLocation);
+//        SourceFolderEntryBuilder builder = new SourceFolderEntryBuilder(this.project, fragmentRoot.getPath());
+//        synchronizeAttributesFromModel(builder, sourceFolder);
+//        return builder.build();
+//    }
+    
+    private IClasspathEntry toClasspathEntry(File folder, IResource physicalLocation, boolean isTest) {
         IPackageFragmentRoot fragmentRoot = this.project.getPackageFragmentRoot(physicalLocation);
         SourceFolderEntryBuilder builder = new SourceFolderEntryBuilder(this.project, fragmentRoot.getPath());
-        synchronizeAttributesFromModel(builder, sourceFolder);
+        List<IClasspathAttribute> attributes = new LinkedList<>();
+        boolean isOptional = folder.toString().contains("generated");
+        if (isOptional) {
+            attributes.add(JavaCore.newClasspathAttribute(IClasspathAttribute.OPTIONAL, "true"));
+        }
+        if (isTest) {
+        	attributes.add(JavaCore.newClasspathAttribute(IClasspathAttribute.TEST, "true"));
+        }
+        builder.setAttributes(attributes.toArray(IClasspathAttribute[]::new));
+
+        IPath projectLocation = project.getProject().getRawLocation();
+        IPath outputPath;
+        // TODO: separate java and resources
+        if (isTest) {
+        	outputPath = project.getProject().getFullPath().append(new Path(testJavaOutputDirectory.toString()).makeRelativeTo(projectLocation));
+        } else {
+        	outputPath = project.getProject().getFullPath().append(new Path(mainJavaOutputDirectory.toString()).makeRelativeTo(projectLocation));
+        }
+        builder.setOutput(outputPath);
         return builder.build();
     }
 
@@ -173,8 +274,8 @@ final class SourceFolderUpdater {
      * @param monitor the monitor to report progress on
      * @throws JavaModelException if the classpath modification fails
      */
-    public static void update(IJavaProject project, List<EclipseSourceDirectory> sourceDirectories, IProgressMonitor monitor) throws JavaModelException {
-        SourceFolderUpdater updater = new SourceFolderUpdater(project, sourceDirectories);
+    public static void update(IJavaProject project, List<EclipseSourceDirectory> sourceDirectories,  Map<String, Object> classpathInfo, IProgressMonitor monitor) throws JavaModelException {
+        SourceFolderUpdater updater = new SourceFolderUpdater(project, sourceDirectories, classpathInfo);
         updater.updateSourceFolders(monitor);
     }
 

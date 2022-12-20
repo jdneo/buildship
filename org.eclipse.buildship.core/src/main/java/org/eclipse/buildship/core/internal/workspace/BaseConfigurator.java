@@ -12,6 +12,7 @@ package org.eclipse.buildship.core.internal.workspace;
 import java.io.File;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.gradle.tooling.model.build.BuildEnvironment;
@@ -31,6 +32,7 @@ import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.JavaModelException;
 
 import org.eclipse.buildship.core.GradleBuild;
+import org.eclipse.buildship.core.GradleCore;
 import org.eclipse.buildship.core.InitializationContext;
 import org.eclipse.buildship.core.ProjectConfigurator;
 import org.eclipse.buildship.core.ProjectContext;
@@ -41,6 +43,7 @@ public class BaseConfigurator implements ProjectConfigurator {
 
     private Map<File, EclipseProject> locationToProject;
     private GradleVersion gradleVersion;
+    private Map<File, Map<String, Object>> classpathInfos = null;
 
     @Override
     public void init(InitializationContext context, IProgressMonitor monitor) {
@@ -54,6 +57,9 @@ public class BaseConfigurator implements ProjectConfigurator {
             this.locationToProject = rootModels.stream()
                 .flatMap(p -> HierarchicalElementUtils.getAll(p).stream())
                 .collect(Collectors.toMap(p -> p.getProjectDirectory(), p -> p));
+            classpathInfos = gradleBuild.withConnection(connection -> {
+            	return connection.model(Map.class).withArguments("--init-script", "C:\\Users\\sheche.FAREAST\\Desktop\\init.gradle").get();
+            }, monitor);
         } catch (Exception e) {
             context.error("Cannot Query Eclipse model", e);
         }
@@ -95,6 +101,17 @@ public class BaseConfigurator implements ProjectConfigurator {
 
         CorePlugin.modelPersistence().saveModel(persistentModel.build());
         CorePlugin.externalLaunchConfigurationManager().updateClasspathProviders(project); // classpath provider depends on persistent model
+        Optional<GradleBuild> build = GradleCore.getWorkspace().getBuild(project);
+        if (build.isPresent()) {
+			try {
+				build.get().withConnection(connection -> {
+					connection.newBuild().forTasks("classes", "testClasses").run();
+					return null; 
+				}, monitor);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
     }
 
     private void synchronizeJavaProject(final ProjectContext context, final EclipseProject model, final IProject project, final PersistentModelBuilder persistentModel, SubMonitor progress) throws CoreException {
@@ -113,7 +130,8 @@ public class BaseConfigurator implements ProjectConfigurator {
         CorePlugin.workspaceOperations().addNature(project, JavaCore.NATURE_ID, progress.newChild(1));
         IJavaProject javaProject = JavaCore.create(project);
         OutputLocationUpdater.update(context, javaProject, model, progress.newChild(1));
-        SourceFolderUpdater.update(javaProject, ImmutableList.copyOf(model.getSourceDirectories()), progress.newChild(1));
+        Map<String, Object> classpathInfo = classpathInfos == null ? null : classpathInfos.get(project.getLocation().toFile());
+        SourceFolderUpdater.update(javaProject, ImmutableList.copyOf(model.getSourceDirectories()), classpathInfo, progress.newChild(1));
         LibraryFilter.update(javaProject, model, progress.newChild(1));
         ClasspathContainerUpdater.update(javaProject, model, progress.newChild(1));
         JavaSourceSettingsUpdater.update(javaProject, model, progress.newChild(1));
